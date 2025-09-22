@@ -110,9 +110,6 @@ const HadithPage: React.FC = () => {
       setTotalCount(count || 0);
       setFilteredHadiths(data);
 
-      if (data.length > 0) {
-        toast.success(`تم جلب ${data.length} حديث بنجاح`);
-      }
     } catch (error: any) {
       console.error('Unexpected error:', error);
       if (error.message?.includes('Failed to fetch')) {
