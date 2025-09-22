@@ -27,6 +27,8 @@ import AdminRecitersPage from './pages/admin/AdminRecitersPage';
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRedirect from './components/AdminRedirect';
+import PersistentAudioPlayer from './components/PersistentAudioPlayer';
+import { AudioProvider } from './contexts/AudioContext';
 import { trackPageView } from './utils/analytics';
 
 function RouteChangeTracker() {
@@ -41,35 +43,36 @@ function RouteChangeTracker() {
 
 function App() {
   return (
-    <Router>
-      <RouteChangeTracker />
-      <Toaster 
-        position="top-center"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#fff',
-            color: '#1E6F5C',
-            border: '1px solid #1E6F5C',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontFamily: 'Noto Sans Arabic, sans-serif'
-          },
-          success: {
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
+    <AudioProvider>
+      <Router>
+        <RouteChangeTracker />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#fff',
+              color: '#1E6F5C',
+              border: '1px solid #1E6F5C',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontFamily: 'Noto Sans Arabic, sans-serif'
             },
-          },
-          error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
+            success: {
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
             },
-          },
-        }}
-      />
-      <Routes>
+            error: {
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
+        <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="quran" element={<QuranPage />} />
@@ -94,7 +97,11 @@ function App() {
           <Route path="admin/reciters" element={<ProtectedRoute><AdminRecitersPage /></ProtectedRoute>} />
         </Route>
       </Routes>
+
+      {/* Persistent Audio Player */}
+      <PersistentAudioPlayer />
     </Router>
+    </AudioProvider>
   );
 }
 

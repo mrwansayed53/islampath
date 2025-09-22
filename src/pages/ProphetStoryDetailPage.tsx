@@ -51,11 +51,40 @@ const ProphetStoryDetailPage: React.FC = () => {
   };
 
   const copyStory = async () => {
+    const text = `قصة النبي ${story.arabicName}\n\n${story.fullStory}`;
+
     try {
-      await navigator.clipboard.writeText(`قصة النبي ${story.arabicName}\n\n${story.fullStory}`);
-      toast.success('📋 تم نسخ القصة بنجاح!');
+      // التحقق من دعم clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        toast.success('📋 تم نسخ القصة بنجاح!');
+      } else {
+        // استخدام طريقة بديلة للمتصفحات القديمة
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+          const successful = document.execCommand('copy');
+          if (successful) {
+            toast.success('📋 تم نسخ القصة بنجاح!');
+          } else {
+            throw new Error('execCommand failed');
+          }
+        } catch (fallbackErr) {
+          toast.error('فشل في نسخ القصة. يرجى تحديد النص ونسخه يدوياً');
+        } finally {
+          document.body.removeChild(textArea);
+        }
+      }
     } catch (err) {
-      toast.error('فشل في نسخ القصة');
+      console.error('Copy error:', err);
+      toast.error('فشل في نسخ القصة. يرجى المحاولة مرة أخرى');
     }
   };
 

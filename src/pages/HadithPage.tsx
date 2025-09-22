@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Search, Star, Share2, Copy, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../services/supabase';
+import { diagnoseSupabaseConnection } from '../utils/diagnose-supabase';
 
 interface Hadith {
   id: string;
@@ -40,7 +41,25 @@ const HadithPage: React.FC = () => {
   const fetchHadiths = async (page = 1, category = 'all', search = '') => {
     try {
       setLoading(true);
-      
+
+      // أولاً: التحقق من الاتصال بقاعدة البيانات
+      const { data: testData, error: testError } = await supabase
+        .from('hadiths')
+        .select('count')
+        .limit(1);
+
+      if (testError) {
+        console.error('Database connection error:', testError);
+        if (testError.code === 'PGRST106') {
+          toast.error('جدول الأحاديث غير موجود في قاعدة البيانات');
+        } else if (testError.code === '42501') {
+          toast.error('ليس لديك صلاحية للوصول لجدول الأحاديث');
+        } else {
+          toast.error(`خطأ في الاتصال بقاعدة البيانات: ${testError.message}`);
+        }
+        return;
+      }
+
       let query = supabase
         .from('hadiths')
         .select('*', { count: 'exact' });
@@ -58,7 +77,7 @@ const HadithPage: React.FC = () => {
       // تطبيق الترقيم
       const from = (page - 1) * hadithsPerPage;
       const to = from + hadithsPerPage - 1;
-      
+
       query = query
         .range(from, to)
         .order('created_at', { ascending: false });
@@ -67,17 +86,40 @@ const HadithPage: React.FC = () => {
 
       if (error) {
         console.error('Error fetching hadiths:', error);
-        toast.error('حدث خطأ في جلب الأحاديث');
+        if (error.code === 'PGRST116') {
+          toast.error('لا توجد أحاديث في قاعدة البيانات');
+        } else if (error.code === '42501') {
+          toast.error('ليس لديك صلاحية لقراءة الأحاديث');
+        } else {
+          toast.error(`خطأ في جلب الأحاديث: ${error.message}`);
+        }
         return;
       }
 
       console.log('Fetched hadiths:', data?.length, 'total:', count);
-      setHadiths(data || []);
+
+      if (!data || data.length === 0) {
+        toast.error('لا توجد أحاديث متاحة حالياً');
+        setHadiths([]);
+        setTotalCount(0);
+        setFilteredHadiths([]);
+        return;
+      }
+
+      setHadiths(data);
       setTotalCount(count || 0);
-      setFilteredHadiths(data || []);
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('حدث خطأ في جلب الأحاديث');
+      setFilteredHadiths(data);
+
+      if (data.length > 0) {
+        toast.success(`تم جلب ${data.length} حديث بنجاح`);
+      }
+    } catch (error: any) {
+      console.error('Unexpected error:', error);
+      if (error.message?.includes('Failed to fetch')) {
+        toast.error('تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت');
+      } else {
+        toast.error(`خطأ غير متوقع: ${error.message || 'خطأ غير معروف'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -93,12 +135,21 @@ const HadithPage: React.FC = () => {
 
       if (error) {
         console.error('Error fetching categories:', error);
+        if (error.code === 'PGRST106') {
+          console.warn('جدول الأحاديث غير موجود - تعذر جلب الفئات');
+        }
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.warn('لا توجد فئات متاحة');
+        setCategories([]);
         return;
       }
 
       // استخراج الفئات الفريدة
       const uniqueCategories = [...new Set(data?.map(item => item.category) || [])];
-      
+
       const categoriesWithIcons = uniqueCategories.map(cat => ({
         id: cat,
         name: cat,
@@ -107,8 +158,12 @@ const HadithPage: React.FC = () => {
       }));
 
       setCategories(categoriesWithIcons);
-    } catch (error) {
-      console.error('Error:', error);
+      console.log(`تم جلب ${categoriesWithIcons.length} فئة`);
+    } catch (error: any) {
+      console.error('Error fetching categories:', error);
+      if (error.message?.includes('Failed to fetch')) {
+        console.warn('تعذر الاتصال بالخادم لجلب الفئات');
+      }
     }
   };
 
@@ -136,12 +191,15 @@ const HadithPage: React.FC = () => {
   useEffect(() => {
     fetchHadiths();
     fetchCategories();
-    
+
     // جلب المفضلة من التخزين المحلي
     const savedFavorites = localStorage.getItem('favoriteHadiths');
     if (savedFavorites) {
       setFavoriteHadiths(JSON.parse(savedFavorites));
     }
+
+    // تشخيص قاعدة البيانات عند تحميل الصفحة
+    diagnoseSupabaseConnection();
   }, []);
 
   // تحديث الأحاديث عند تغيير الفلاتر
@@ -477,8 +535,52 @@ const HadithPage: React.FC = () => {
             {filteredHadiths.length === 0 && !loading && (
               <div className="text-center py-12">
                 <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-medium text-gray-600 mb-2">لا توجد أحاديث</h3>
-                <p className="text-gray-500">جرب تغيير معايير البحث أو الفلتر</p>
+                <h3 className="text-xl font-medium text-gray-600 dark:text-gray-300 mb-2">لا توجد أحاديث</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-6">
+                  {searchQuery || selectedCategory !== 'all'
+                    ? 'جرب تغيير معايير البحث أو الفلتر'
+                    : 'لا توجد أحاديث في قاعدة البيانات حالياً'
+                  }
+                </p>
+                <div className="flex gap-4 justify-center">
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('all');
+                      setCurrentPage(1);
+                      fetchHadiths();
+                    }}
+                    className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                  >
+                    إعادة تحميل الأحاديث
+                  </button>
+                  <button
+                    onClick={async () => {
+                      console.log('🔄 تشغيل تشخيص قاعدة البيانات...');
+                      const result = await diagnoseSupabaseConnection();
+                      if (result) {
+                        toast.success('تم فحص قاعدة البيانات بنجاح');
+                      } else {
+                        toast.error('توجد مشكلة في قاعدة البيانات - راجع Console للتفاصيل');
+                      }
+                    }}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    فحص قاعدة البيانات
+                  </button>
+                  {(searchQuery || selectedCategory !== 'all') && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSelectedCategory('all');
+                        setCurrentPage(1);
+                      }}
+                      className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                    >
+                      مسح الفلاتر
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </>

@@ -95,18 +95,61 @@ const AudioQuranPage: React.FC = () => {
 
     // Create audio element with better configuration
     const audio = new Audio();
-    audio.volume = 0.7;
+
+    // Restore saved volume or use default
+    const savedVolume = localStorage.getItem('quran-audio-volume');
+    audio.volume = savedVolume ? parseFloat(savedVolume) : 0.7;
+    setVolume(audio.volume);
+
     audio.preload = 'none'; // Don't preload to avoid CORS issues
-    
+
     // Remove crossOrigin to avoid CORS issues
     // audio.crossOrigin = 'anonymous';
+
+    // Enable background audio playback
+    audio.setAttribute('playsinline', '');
+
+    // Prevent audio from being paused when page visibility changes
+    const handleVisibilityChange = () => {
+      if (document.hidden && audio && !audio.paused) {
+        // Keep playing in background
+        console.log('Page hidden, continuing audio playback');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Initialize Media Session API for background audio control
+    if ('mediaSession' in navigator) {
+      console.log('Media Session API supported');
+    }
     
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      // Update Media Session position
+      if ('mediaSession' in navigator && duration > 0) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: duration,
+            playbackRate: audio.playbackRate,
+            position: audio.currentTime
+          });
+        } catch (error) {
+          console.log('Media Session position update failed:', error);
+        }
+      }
+    };
     const handleLoadedMetadata = () => setDuration(audio.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      updateMediaSessionMetadata();
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      updateMediaSessionMetadata();
+    };
     const handleEnded = () => {
       setCurrentTime(0);
       setIsPlaying(false);
@@ -180,6 +223,7 @@ const AudioQuranPage: React.FC = () => {
         audio.pause();
         audio.src = '';
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -364,7 +408,10 @@ const AudioQuranPage: React.FC = () => {
         setSelectedReciter(reciter || null);
         setPlayingSurah(surahNumber);
         setIsPlaying(true);
-        
+
+        // Update Media Session metadata
+        updateMediaSessionMetadata(surahName, reciterName);
+
         // رسالة نجح التشغيل
         toast.success(`تم تشغيل ${surahName} بصوت ${reciterName}`, {
           duration: 3000,
@@ -484,9 +531,11 @@ const AudioQuranPage: React.FC = () => {
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVolume = parseFloat(e.target.value);
     setVolume(newVolume);
-    
+
     if (audioElement) {
       audioElement.volume = newVolume;
+      // Store volume preference for background play
+      localStorage.setItem('quran-audio-volume', newVolume.toString());
     }
   };
 
@@ -538,13 +587,69 @@ const AudioQuranPage: React.FC = () => {
     }
   };
 
+  // Update Media Session metadata and controls
+  const updateMediaSessionMetadata = (surahName?: string, reciterName?: string) => {
+    if ('mediaSession' in navigator) {
+      const currentSurah = surahName || (playingSurah ? surahs.find(s => s.number === playingSurah)?.name || '' : '');
+      const currentReciter = reciterName || selectedReciter?.arabic_name || '';
+
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSurah,
+        artist: currentReciter,
+        album: 'القرآن الكريم',
+        artwork: [
+          { src: '/favicon.ico', sizes: '96x96', type: 'image/x-icon' }
+        ]
+      });
+
+      // Set playback state
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+      // Setup action handlers
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (audioElement && playingSurah) {
+          audioElement.play();
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (audioElement) {
+          audioElement.pause();
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        playPrevious();
+      });
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        playNext();
+      });
+
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (audioElement && details.seekTime) {
+          audioElement.currentTime = details.seekTime;
+        }
+      });
+
+      // Update position state
+      if (audioElement && duration > 0) {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: audioElement.playbackRate,
+          position: currentTime
+        });
+      }
+    }
+  };
+
   // Auto-play next surah when current ends
   const handleAutoNext = () => {
     if (playingSurah && playingSurah < 114) {
       const nextSurah = getNextSurah();
       if (nextSurah && selectedReciter) {
         const surahName = surahs.find(s => s.number === nextSurah)?.name || '';
-        toast(`تشغيل تلقائي: ${surahName}`, { 
+        toast(`تشغيل تلقائي: ${surahName}`, {
           duration: 3000,
           icon: '▶️'
         });
