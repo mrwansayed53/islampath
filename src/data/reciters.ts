@@ -13,7 +13,8 @@ export const famousReciters = [
       'https://archive.org/download/AbdulBasit/001'
     ],
     description: 'صوت من السماء - مصر',
-    country: 'مصر'
+    country: 'مصر',
+    zip_url: 'https://mp3quran.net/download/basit'
   },
   {
     id: 'minshawi',
@@ -26,7 +27,8 @@ export const famousReciters = [
       'https://server6.mp3quran.net/minsh'
     ],
     description: 'صاحب الصوت الذهبي - مصر',
-    country: 'مصر'
+    country: 'مصر',
+    zip_url: 'https://mp3quran.net/download/minsh'
   },
   {
     id: 'husary',
@@ -39,7 +41,8 @@ export const famousReciters = [
       'https://server6.mp3quran.net/husary'
     ],
     description: 'شيخ المقرئين وأستاذ الجيل - مصر',
-    country: 'مصر'
+    country: 'مصر',
+    zip_url: 'https://mp3quran.net/download/husr'
   },
   {
     id: 'mustafa_ismail',
@@ -52,7 +55,8 @@ export const famousReciters = [
       'https://server10.mp3quran.net/mustafa'
     ],
     description: 'صاحب النبرة الحزينة - مصر',
-    country: 'مصر'
+    country: 'مصر',
+    zip_url: 'https://mp3quran.net/download/mustafa'
   },
 
   // القراء السعوديون المعاصرون
@@ -67,7 +71,8 @@ export const famousReciters = [
       'https://server10.mp3quran.net/saad_ghamdi'
     ],
     description: 'صوت هادئ وجميل - السعودية',
-    country: 'السعودية'
+    country: 'السعودية',
+    zip_url: 'https://mp3quran.net/download/s_gmd'
   },
   {
     id: 'maher_almuaiqly',
@@ -80,7 +85,8 @@ export const famousReciters = [
       'https://server8.mp3quran.net/maher'
     ],
     description: 'إمام المسجد النبوي - السعودية',
-    country: 'السعودية'
+    country: 'السعودية',
+    zip_url: 'https://mp3quran.net/download/maher'
   },
   {
     id: 'abdurrahman_sudais',
@@ -93,7 +99,8 @@ export const famousReciters = [
       'https://server6.mp3quran.net/sudais'
     ],
     description: 'إمام الحرم المكي الشريف - السعودية',
-    country: 'السعودية'
+    country: 'السعودية',
+    zip_url: 'https://mp3quran.net/download/sds'
   },
   {
     id: 'mishari_alafasy',
@@ -106,7 +113,8 @@ export const famousReciters = [
       'https://server10.mp3quran.net/mishari'
     ],
     description: 'صوت جميل ومؤثر - الكويت',
-    country: 'الكويت'
+    country: 'الكويت',
+    zip_url: 'https://mp3quran.net/download/afs'
   },
   {
     id: 'yasser_aldosari',
@@ -119,7 +127,8 @@ export const famousReciters = [
       'https://server8.mp3quran.net/yasser'
     ],
     description: 'قراءة خاشعة ومبكية - السعودية',
-    country: 'السعودية'
+    country: 'السعودية',
+    zip_url: 'https://mp3quran.net/download/yasser'
   },
   {
     id: 'ali_jaber',
@@ -133,7 +142,8 @@ export const famousReciters = [
       'https://server8.mp3quran.net/jaber'
     ],
     description: 'إمام المسجد النبوي - السعودية',
-    country: 'السعودية'
+    country: 'السعودية',
+    zip_url: 'https://mp3quran.net/download/jaber'
   },
   {
     id: 'muhammad_ayyub',
@@ -147,7 +157,8 @@ export const famousReciters = [
       'https://archive.org/download/muhammad_ayyub_quran'
     ],
     description: 'إمام المسجد النبوي - السعودية',
-    country: 'السعودية'
+    country: 'السعودية',
+    zip_url: 'https://mp3quran.net/download/ayyub'
   },
   {
     id: 'nasser_alqatami',
@@ -160,7 +171,8 @@ export const famousReciters = [
       'https://server11.mp3quran.net/nasser_qatami'
     ],
     description: 'صوت مؤثر وجميل - السعودية',
-    country: 'السعودية'
+    country: 'السعودية',
+    zip_url: 'https://mp3quran.net/download/qtm'
   }
 ];
 
@@ -171,7 +183,7 @@ export function getAudioUrl(reciterId: string, surahNumber: number): string {
     // استخدام الحصري كقارئ افتراضي في حالة عدم وجود القارئ
     return `https://server13.mp3quran.net/husr/${surahNumber.toString().padStart(3, '0')}.mp3`;
   }
-  
+
   return `${reciter.audio_base_url}/${surahNumber.toString().padStart(3, '0')}.mp3`;
 }
 
@@ -181,23 +193,16 @@ export function getFallbackAudioUrls(reciterId: string, surahNumber: number): st
   if (!reciter || !reciter.fallback_urls) {
     return [getFallbackAudioUrl(surahNumber)];
   }
-  
+
   const surahCode = surahNumber.toString().padStart(3, '0');
   return reciter.fallback_urls.map(url => `${url}/${surahCode}.mp3`);
 }
 
-// دالة للتحقق من صحة رابط الصوت
+// دالة للتحقق من صحة رابط الصوت (HEAD فقط لتوفير البيانات)
 export async function validateAudioUrl(url: string): Promise<boolean> {
   try {
-    // Try HEAD first
-    let response = await fetch(url, { method: 'HEAD' });
-    let contentType = response.headers.get('content-type');
-    // Fallback to GET if HEAD fails or is not audio
-    if (!response.ok || !contentType?.includes('audio')) {
-      response = await fetch(url, { method: 'GET' });
-      contentType = response.headers.get('content-type');
-    }
-    return response.ok && (contentType?.includes('audio') || false);
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
   } catch {
     return false;
   }

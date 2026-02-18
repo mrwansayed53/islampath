@@ -4,26 +4,14 @@
 
 # Local development settings
 [dev]
-  # Command Netlify CLI will run. Must start the Vite dev-server.
   command = "npm run dev"
-  # Port where Vite serves the app (defaults to 5173). Adjust if you use --port.
   targetPort = 5173
-  # Port for Netlify proxy (the one you open in your browser). Default 8888.
   port = 8888
-  # Wait time (ms) before Netlify reports "waiting for server". Optional.
   timeout = 10000
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
 
 [build.environment]
   NODE_VERSION = "18"
   NPM_VERSION = "9"
-  VITE_SUPABASE_URL = "https://feczsdecgyahglargwap.supabase.co"
-  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlY3pzZGVjZ3lhaGdsYXJnd2FwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxNDE4NjEsImV4cCI6MjA2NDcxNzg2MX0.NMliJLiebIgUFa-CrHA0pI6SVYX0oMYIRasxvqSgudo"
-  VITE_GA_MEASUREMENT_ID = "G-LKS2T3XCFR"
 
 [[headers]]
   for = "/*"
@@ -45,13 +33,13 @@
     Access-Control-Allow-Methods = "GET, HEAD, OPTIONS"
     Access-Control-Allow-Headers = "Range"
 
-# Handle SPA routing
+# API proxy to Netlify Functions
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# Fallback for client-side routing
+# SPA fallback for client-side routing
 [[redirects]]
   from = "/*"
   to = "/index.html"

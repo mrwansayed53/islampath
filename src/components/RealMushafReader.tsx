@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tafseer, Surah } from '../types';
 import { fetchTafseer, fetchSurahs, fetchAyah } from '../api/quranApi';
-import { getReciters } from '../services/supabase';
+
 import { famousReciters } from '../data/reciters';
-import { Book, X, ChevronLeft, ChevronRight, Loader2, Volume2, Play, Pause, SkipForward, SkipBack } from 'lucide-react';
+import { Book, X, ChevronLeft, ChevronRight, Loader2, Volume2, Play, Pause } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   getAudioUrl,
   getFallbackAudioUrls,
-  validateAudioUrl,
+
   getValidAudioUrl,
   getReciterById
 } from '../data/reciters';
@@ -63,15 +63,15 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageData, setPageData] = useState<PageData | null>(null);
-  const [selectedAyah, setSelectedAyah] = useState<{surah: number, ayah: number} | null>(null);
+  const [selectedAyah, setSelectedAyah] = useState<{ surah: number, ayah: number } | null>(null);
   const [tafseer, setTafseer] = useState<Tafseer | null>(null);
   const [tafseerLoading, setTafseerLoading] = useState(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
-  
+
   // للصوت الخاص بالآيات الفردية
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  
+
   // للصوت الخاص بتشغيل السور كاملة
   const [reciters, setReciters] = useState<Reciter[]>([]);
   const [selectedReciter, setSelectedReciter] = useState<Reciter | null>(null);
@@ -109,23 +109,23 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
   const loadPageData = async (page: number) => {
     setPageLoading(true);
     console.log(`Loading page ${page}...`);
-    
+
     try {
       // استخدام API الموثوق alquran.cloud أولاً
       console.log('Trying primary API...');
       const response = await fetch(`https://api.alquran.cloud/v1/page/${page}/quran-uthmani`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       console.log('Primary API data received:', data);
-      
+
       if (data.code === 200 && data.data && data.data.ayahs && data.data.ayahs.length > 0) {
         const ayahs = data.data.ayahs;
         const firstAyah = ayahs[0];
-        
+
         const processedData: PageData = {
           page: page,
           surah_name: firstAyah.surah?.name || `سورة ${firstAyah.surah?.number || 1}`,
@@ -137,7 +137,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
             key: `${ayah.surah?.number || 1}:${ayah.numberInSurah || 1}`
           }))
         };
-        
+
         console.log('Primary processed data:', processedData);
         setPageData(processedData);
         return;
@@ -146,20 +146,20 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
       }
     } catch (error) {
       console.error('Primary API failed:', error);
-      
+
       // محاولة API بديل - QuranCDN
       try {
         console.log('Trying secondary API...');
         const altResponse = await fetch(`https://api.qurancdn.com/api/qdc/verses/by_page/${page}`);
-        
+
         if (altResponse.ok) {
           const altData = await altResponse.json();
           console.log('Secondary API data:', altData);
-          
+
           if (altData.verses && altData.verses.length > 0) {
             const verses = altData.verses;
             const firstVerse = verses[0];
-            
+
             const processedData: PageData = {
               page: page,
               surah_name: `سورة ${firstVerse.chapter_id || 1}`,
@@ -171,7 +171,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
                 key: verse.verse_key || `${verse.chapter_id}:${verse.verse_number}`
               }))
             };
-            
+
             console.log('Secondary processed data:', processedData);
             setPageData(processedData);
             return;
@@ -180,11 +180,11 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
       } catch (altError) {
         console.error('Secondary API also failed:', altError);
       }
-      
+
       // استخدام بيانات تجريبية واضحة ومفصلة
       console.log('Using fallback data for page:', page);
       const fallbackData: PageData = getPageFallbackData(page);
-      
+
       setPageData(fallbackData);
       toast.error('تعذر تحميل بيانات الصفحة، سيتم استخدام بيانات تجريبية');
     } finally {
@@ -194,7 +194,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
 
   // دالة للحصول على بيانات تجريبية حسب رقم الصفحة
   const getPageFallbackData = (page: number): PageData => {
-    const ayahsData: { [key: number]: { surah_name: string; ayahs: Array<{text: string; surah: number; ayah: number; key: string}> } } = {
+    const ayahsData: { [key: number]: { surah_name: string; ayahs: Array<{ text: string; surah: number; ayah: number; key: string }> } } = {
       1: {
         surah_name: 'الفاتحة',
         ayahs: [
@@ -231,11 +231,11 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
   // تحميل الصفحة عند التغيير
   useEffect(() => {
     loadPageData(currentPage);
-    
+
     // رسالة ترحيبية بالتحديثات الجديدة
     const hasSeenUpdate = localStorage.getItem('mushaf_update_seen');
     const hasSeenRecitersFix = localStorage.getItem('reciters_audio_fix_seen');
-    
+
     if (!hasSeenUpdate) {
       setTimeout(() => {
         // toast success removed per user request
@@ -253,10 +253,10 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
   useEffect(() => {
     const loadReciters = () => {
       // استخدام قائمة القراء الموحدة فقط لتجنب التضارب
-      const sortedReciters = [...famousReciters].sort((a, b) => 
+      const sortedReciters = [...famousReciters].sort((a, b) =>
         a.arabic_name.localeCompare(b.arabic_name, 'ar')
       );
-      
+
       setReciters(sortedReciters);
       setSelectedReciter(sortedReciters[0] || null);
     };
@@ -268,25 +268,25 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
   useEffect(() => {
     const surahAudio = new Audio();
     surahAudio.preload = 'none';
-    
+
     surahAudio.addEventListener('ended', () => {
       setIsSurahPlaying(false);
       setCurrentSurah(null);
       setSurahAudioLoading(false);
     });
-    
+
     surahAudio.addEventListener('play', () => {
       setIsSurahPlaying(true);
       setSurahAudioLoading(false);
     });
-    
+
     surahAudio.addEventListener('pause', () => {
       setIsSurahPlaying(false);
       setSurahAudioLoading(false);
     });
-    
+
     setSurahAudioRef(surahAudio);
-    
+
     return () => {
       surahAudio.pause();
       surahAudio.src = '';
@@ -299,12 +299,12 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
       audioRef.current = new Audio();
       audioRef.current.preload = 'none';
       audioRef.current.crossOrigin = 'anonymous';
-      
+
       audioRef.current.addEventListener('ended', () => {
         console.log('Audio playback ended');
         setIsAudioLoading(false);
       });
-      
+
       audioRef.current.addEventListener('play', () => {
         console.log('Audio started playing');
         setIsAudioLoading(false);
@@ -314,7 +314,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
         console.log('⏸️ Audio paused');
         setIsAudioLoading(false);
       });
-      
+
       // إزالة event listener للخطأ العام لتجنب رسائل الخطأ المزعجة
       // سيتم التعامل مع الأخطاء داخل دالة playAyahAudio
     }
@@ -331,7 +331,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
   // التعامل مع النقر على الآية
   const handleAyahClick = async (surah: number, ayah: number) => {
     console.log(`Clicked ayah: ${surah}:${ayah}`);
-    
+
     // إغلاق التفسير إذا كانت نفس الآية
     if (selectedAyah && selectedAyah.surah === surah && selectedAyah.ayah === ayah) {
       setSelectedAyah(null);
@@ -361,81 +361,81 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
   // دالة تشغيل صوت الآية
   const playAyahAudio = async (surah: number, ayah: number) => {
     if (!audioRef.current) return;
-    
+
     console.log(`Attempting to play audio for ${surah}:${ayah}`);
     setIsAudioLoading(true);
-    
+
     // إيقاف أي صوت سابق
     audioRef.current.pause();
     audioRef.current.currentTime = 0;
-    
-          // تجربة عدة مصادر صوتية للآيات الفردية (العفاسي والحصري كافتراضي)
-      const formattedSurah = surah.toString().padStart(3, '0');
-      const formattedAyah = ayah.toString().padStart(3, '0');
-      
-      const audioSources = [
-        // العفاسي - أولوية عالية
-        `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${surah}/${ayah}.mp3`,
-        `https://audio.qurancdn.com/Alafasy_128kbps/${formattedSurah}${formattedAyah}.mp3`,
-        `https://everyayah.com/data/Alafasy_128kbps/${formattedSurah}${formattedAyah}.mp3`,
-        
-        // الحصري - أولوية متوسطة
-        `https://cdn.islamic.network/quran/audio/128/ar.husary/${surah}/${ayah}.mp3`,
-        `https://audio.qurancdn.com/Husary_128kbps/${formattedSurah}${formattedAyah}.mp3`,
-        `https://everyayah.com/data/Husary_64kbps/${formattedSurah}${formattedAyah}.mp3`,
-        
-        // عبد الباسط - أولوية متوسطة
-        `https://audio.qurancdn.com/Abdul_Basit_Murattal_192kbps/${formattedSurah}${formattedAyah}.mp3`,
-        `https://cdn.islamic.network/quran/audio/128/ar.abdulbasitmurattal/${surah}/${ayah}.mp3`,
-        
-        // المنشاوي - أولوية متوسطة
-        `https://audio.qurancdn.com/Minshawi_Murattal_128kbps/${formattedSurah}${formattedAyah}.mp3`,
-        `https://everyayah.com/data/Minshawi_Murattal_128kbps/${formattedSurah}${formattedAyah}.mp3`
-      ];
-    
+
+    // تجربة عدة مصادر صوتية للآيات الفردية (العفاسي والحصري كافتراضي)
+    const formattedSurah = surah.toString().padStart(3, '0');
+    const formattedAyah = ayah.toString().padStart(3, '0');
+
+    const audioSources = [
+      // العفاسي - أولوية عالية
+      `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${surah}/${ayah}.mp3`,
+      `https://audio.qurancdn.com/Alafasy_128kbps/${formattedSurah}${formattedAyah}.mp3`,
+      `https://everyayah.com/data/Alafasy_128kbps/${formattedSurah}${formattedAyah}.mp3`,
+
+      // الحصري - أولوية متوسطة
+      `https://cdn.islamic.network/quran/audio/128/ar.husary/${surah}/${ayah}.mp3`,
+      `https://audio.qurancdn.com/Husary_128kbps/${formattedSurah}${formattedAyah}.mp3`,
+      `https://everyayah.com/data/Husary_64kbps/${formattedSurah}${formattedAyah}.mp3`,
+
+      // عبد الباسط - أولوية متوسطة
+      `https://audio.qurancdn.com/Abdul_Basit_Murattal_192kbps/${formattedSurah}${formattedAyah}.mp3`,
+      `https://cdn.islamic.network/quran/audio/128/ar.abdulbasitmurattal/${surah}/${ayah}.mp3`,
+
+      // المنشاوي - أولوية متوسطة
+      `https://audio.qurancdn.com/Minshawi_Murattal_128kbps/${formattedSurah}${formattedAyah}.mp3`,
+      `https://everyayah.com/data/Minshawi_Murattal_128kbps/${formattedSurah}${formattedAyah}.mp3`
+    ];
+
     for (let i = 0; i < audioSources.length; i++) {
       const audioUrl = audioSources[i];
       console.log(`Trying audio source ${i + 1}/${audioSources.length}: ${audioUrl}`);
-      
+
       try {
         audioRef.current.src = audioUrl;
         audioRef.current.load();
-        
+
         // انتظار تحميل الصوت
         const loadPromise = new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Timeout'));
           }, 5000);
-          
+
           const onCanPlay = () => {
             clearTimeout(timeout);
             audioRef.current?.removeEventListener('canplay', onCanPlay);
             audioRef.current?.removeEventListener('error', onError);
             resolve();
           };
-          
+
           const onError = (e: Event) => {
             clearTimeout(timeout);
             audioRef.current?.removeEventListener('canplay', onCanPlay);
             audioRef.current?.removeEventListener('error', onError);
             reject(new Error('Load error'));
           };
-          
+
           audioRef.current?.addEventListener('canplay', onCanPlay);
           audioRef.current?.addEventListener('error', onError);
         });
-        
+
         await loadPromise;
-        
+
         // تشغيل الصوت
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           await playPromise;
         }
-        
+
         console.log(`✅ Successfully playing: ${audioUrl}`);
         setIsAudioLoading(false);
-        
+
         // تحديد اسم القارئ بناءً على الرابط
         let reciterName = 'القارئ';
         if (audioUrl.includes('alafasy')) {
@@ -443,16 +443,16 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
         } else if (audioUrl.includes('husary')) {
           reciterName = 'الشيخ محمود الحصري';
         }
-        
+
         toast.success(`يتم تشغيل الآية بصوت ${reciterName}`, {
           duration: 3000,
           position: 'top-center'
         });
         return; // نجح التشغيل، اخرج من الحلقة
-        
+
       } catch (error) {
         console.log(`❌ Failed to play: ${audioUrl}`, error);
-        
+
         // إذا كان هذا آخر مصدر، أظهر رسالة خطأ
         if (i === audioSources.length - 1) {
           console.error('❌ جميع مصادر الصوت فشلت');
@@ -528,21 +528,21 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
 
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Timeout')), 8000);
-          
+
           const onCanPlay = () => {
             clearTimeout(timeout);
             surahAudioRef.removeEventListener('canplay', onCanPlay);
             surahAudioRef.removeEventListener('error', onError);
             resolve(true);
           };
-          
+
           const onError = () => {
             clearTimeout(timeout);
             surahAudioRef.removeEventListener('canplay', onCanPlay);
             surahAudioRef.removeEventListener('error', onError);
             reject(new Error('Audio load failed'));
           };
-          
+
           surahAudioRef.addEventListener('canplay', onCanPlay);
           surahAudioRef.addEventListener('error', onError);
         });
@@ -551,7 +551,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
         setCurrentSurah(surahNumber);
         setIsSurahPlaying(true);
         setSurahAudioLoading(false);
-        
+
         // الحصول على اسم السورة
         const surahName = getSurahName(surahNumber);
         toast.success(`يتم تشغيل ${surahName} بصوت ${selectedReciter.arabic_name}`, {
@@ -631,10 +631,10 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
       stopAudio();
       // إغلاق قائمة القراء عند التنقل
       setShowReciterSelector(false);
-      
+
       // إضافة تحديث في التاريخ للتنقل السريع
       window.history.replaceState(null, '', `?page=${page}`);
-      
+
       toast.success(`انتقلت إلى الصفحة ${page}`, {
         duration: 1500,
         position: 'bottom-center',
@@ -675,7 +675,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
       11: 202, 12: 222, 13: 242, 14: 262, 15: 282, 16: 302, 17: 322, 18: 342, 19: 362, 20: 382,
       21: 402, 22: 422, 23: 442, 24: 462, 25: 482, 26: 502, 27: 522, 28: 542, 29: 562, 30: 582
     };
-    
+
     const page = juzPages[juzNumber as keyof typeof juzPages];
     if (page) {
       goToPage(page);
@@ -841,7 +841,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
 
       // استخدام النظام الجديد للحصول على أفضل رابط صوتي
       const audioUrl = await getValidAudioUrl(selectedReciter.id, surahNumber);
-      
+
       if (!audioUrl) {
         throw new Error('لم يتم العثور على رابط صوتي صالح');
       }
@@ -880,7 +880,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
 
       // تشغيل الصوت
       await audioRef.current.play();
-      
+
       setCurrentSurah(surahNumber);
       setIsSurahPlaying(true);
 
@@ -892,17 +892,17 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
 
     } catch (error) {
       console.error('خطأ في تشغيل الصوت:', error);
-      
+
       // محاولة استخدام الرابط الاحتياطي العام (الحصري)
       try {
         const fallbackUrl = `https://server13.mp3quran.net/husr/${surahNumber.toString().padStart(3, '0')}.mp3`;
-        
+
         if (audioRef.current) {
           console.log(`🔄 تجربة الرابط الاحتياطي: ${fallbackUrl}`);
-          
+
           audioRef.current.src = fallbackUrl;
           audioRef.current.load();
-          
+
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
               reject(new Error('انتهت مهلة الرابط الاحتياطي'));
@@ -929,7 +929,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
           });
 
           await audioRef.current.play();
-          
+
           setCurrentSurah(surahNumber);
           setIsSurahPlaying(true);
 
@@ -954,7 +954,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
         setError('فشل في تحميل الملف الصوتي. يرجى المحاولة مرة أخرى.');
         setIsSurahPlaying(false);
         setCurrentSurah(null);
-        
+
         toast.error('فشل في تشغيل الصوت. يرجى المحاولة لاحقاً', {
           duration: 4000,
           position: 'top-center',
@@ -979,7 +979,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
           position: 'top-center',
         });
       }
-    } 
+    }
     // إذا كانت السورة الحالية متوقفة، شغلها
     else if (currentSurah === surahNumber && !isSurahPlaying) {
       if (audioRef.current) {
@@ -1078,53 +1078,53 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
           {/* أزرار التحكم */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             {/* اختيار القارئ */}
-            <div 
+            <div
               data-reciter-selector
               style={{ position: 'relative' }}
               onClick={(e) => e.stopPropagation()} // منع إغلاق القائمة عند النقر داخلها
             >
-                              <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowReciterSelector(!showReciterSelector);
-                  }}
-                  disabled={reciters.length === 0}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 16px',
-                    background: 'white',
-                    border: '2px solid #10b981',
-                    borderRadius: '8px',
-                    color: '#047857',
-                    cursor: reciters.length === 0 ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    transition: 'all 0.3s ease',
-                    minWidth: '180px',
-                    justifyContent: 'space-between',
-                    opacity: reciters.length === 0 ? 0.5 : 1
-                  }}
-                >
-                  {reciters.length === 0 ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>جاري التحميل...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{selectedReciter?.arabic_name || 'اختر القارئ'}</span>
-                      <span style={{ 
-                        transform: showReciterSelector ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.3s ease'
-                      }}>
-                        ▼
-                      </span>
-                    </>
-                  )}
-                </button>
-              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReciterSelector(!showReciterSelector);
+                }}
+                disabled={reciters.length === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  background: 'white',
+                  border: '2px solid #10b981',
+                  borderRadius: '8px',
+                  color: '#047857',
+                  cursor: reciters.length === 0 ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.3s ease',
+                  minWidth: '180px',
+                  justifyContent: 'space-between',
+                  opacity: reciters.length === 0 ? 0.5 : 1
+                }}
+              >
+                {reciters.length === 0 ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>جاري التحميل...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{selectedReciter?.arabic_name || 'اختر القارئ'}</span>
+                    <span style={{
+                      transform: showReciterSelector ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.3s ease'
+                    }}>
+                      ▼
+                    </span>
+                  </>
+                )}
+              </button>
+
               {showReciterSelector && (
                 <div style={{
                   position: 'absolute',
@@ -1183,9 +1183,9 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
                         )}
                       </div>
                       {reciter.description && (
-                        <div style={{ 
-                          fontSize: '12px', 
-                          color: '#6b7280', 
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#6b7280',
                           marginTop: '4px',
                           fontWeight: 'normal'
                         }}>
@@ -1229,10 +1229,10 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
                 ) : (
                   <Play className="w-5 h-5" />
                 )}
-                {surahAudioLoading 
-                  ? 'جاري التحميل...' 
-                  : currentSurah === pageData.ayahs[0]?.surah && isSurahPlaying 
-                    ? 'إيقاف السورة' 
+                {surahAudioLoading
+                  ? 'جاري التحميل...'
+                  : currentSurah === pageData.ayahs[0]?.surah && isSurahPlaying
+                    ? 'إيقاف السورة'
                     : `تشغيل ${getSurahName(pageData.ayahs[0]?.surah || 1)}`
                 }
               </button>
@@ -1287,13 +1287,24 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
               return (
                 <React.Fragment key={`${ayah.surah}:${ayah.ayah}`}>
                   {isNewSurah && (
-                    <div className="surah-separator" style={{ textAlign: 'center', margin: '24px 0' }}>
-                      <div className="surah-separator-name" style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>
-                        سورة {surahInfo?.name}
-                      </div>
-                      <div className="surah-separator-meta" style={{ color: '#6b7280', fontSize: '14px' }}>
-                        الجزء {pageData.juz} - {getRevelationTypeArabic(surahInfo?.revelationType || '')}
-                      </div>
+                    <div className="surah-separator" style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      margin: '16px 0 12px',
+                      direction: 'rtl'
+                    }}>
+                      <div style={{ flex: 1, height: '1px', background: 'linear-gradient(to left, transparent, #b8860b)' }}></div>
+                      <span style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: '#1a5c3a',
+                        fontFamily: "'Amiri', serif",
+                        whiteSpace: 'nowrap'
+                      }}>
+                        ❁ سورة {surahInfo?.name || getSurahName(ayah.surah)} ❁
+                      </span>
+                      <div style={{ flex: 1, height: '1px', background: 'linear-gradient(to right, transparent, #b8860b)' }}></div>
                     </div>
                   )}
                   <span
@@ -1339,7 +1350,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
             <ChevronRight className="w-5 h-5" />
             السابقة
           </button>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1))', padding: '16px 20px', borderRadius: '16px', border: '2px solid rgba(16, 185, 129, 0.3)' }}>
             <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#047857' }}>
               صفحة {currentPage} من 604
@@ -1362,7 +1373,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
               placeholder="رقم"
             />
           </div>
-          
+
           <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === 604} className="nav-button next" style={{ /* unchanged styles */ }}>
             التالية
             <ChevronLeft className="w-5 h-5" />
@@ -1433,13 +1444,13 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
           <div className="tafseer-content">
             <div className="tafseer-header">
               <h3 className="tafseer-title">
-                تفسير الآية {selectedAyah.ayah} من سورة {pageData?.surah_name}
+                تفسير الآية {selectedAyah.ayah} من سورة {getSurahName(selectedAyah.surah)}
               </h3>
               <button onClick={closeTafseer} className="close-button">
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             <div className="tafseer-body">
               {tafseerLoading ? (
                 <div className="loading-animation">
@@ -1455,12 +1466,12 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
                       <span className="ayah-number-large">﴿{selectedAyah.ayah}﴾</span>
                     </p>
                   </div>
-                  
+
                   {/* أزرار التحكم في الصوت */}
-                  <div className="audio-controls" style={{ 
-                    display: 'flex', 
-                    gap: '12px', 
-                    justifyContent: 'center', 
+                  <div className="audio-controls" style={{
+                    display: 'flex',
+                    gap: '12px',
+                    justifyContent: 'center',
                     marginBottom: '20px',
                     padding: '16px',
                     background: 'rgba(16, 185, 129, 0.1)',
@@ -1520,10 +1531,10 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
                       ) : (
                         <Volume2 className="w-5 h-5" />
                       )}
-                      {isLoading ? 'جاري التحميل...' : 
-                       currentSurah === selectedAyah?.surah && isSurahPlaying ? 'إيقاف السورة' : 'تشغيل السورة'}
+                      {isLoading ? 'جاري التحميل...' :
+                        currentSurah === selectedAyah?.surah && isSurahPlaying ? 'إيقاف السورة' : 'تشغيل السورة'}
                     </button>
-                    
+
                     <button
                       onClick={stopAudio}
                       style={{
@@ -1551,7 +1562,7 @@ const RealMushafReader: React.FC<RealMushafReaderProps> = ({ loading = false }) 
                       <Book className="w-6 h-6 text-emerald-600" />
                       <h4 className="tafseer-subtitle">التفسير:</h4>
                     </div>
-                    
+
                     {tafseer && (
                       <p className="tafseer-text">
                         {tafseer.text}

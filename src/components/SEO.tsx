@@ -38,7 +38,7 @@ function SEO({ title, description, canonical, image }: SeoProps) {
       {/* Structured Data */}
       <script type="application/ld+json">
         {JSON.stringify({
-          '@context': 'http://schema.org',
+          '@context': 'https://schema.org',
           '@type': 'Organization',
           url: 'https://www.islampath.site',
           name: 'Islamic Website',

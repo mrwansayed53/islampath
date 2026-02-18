@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
 import { Surah, Reciter } from '../types';
 import { famousReciters, getValidAudioUrl, getReciterById } from '../data/reciters';
 import { fetchSurahs } from '../api/quranApi';
@@ -54,6 +54,187 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
   const [reciters, setReciters] = useState<Reciter[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Use refs for values needed inside event handlers to avoid stale closures
+  const playingSurahRef = useRef(playingSurah);
+  const selectedReciterRef = useRef(selectedReciter);
+  const surahsRef = useRef(surahs);
+  const isPlayingRef = useRef(isPlaying);
+  const durationRef = useRef(duration);
+  const currentTimeRef = useRef(currentTime);
+  const volumeRef = useRef(volume);
+
+  // Keep refs in sync with state
+  useEffect(() => { playingSurahRef.current = playingSurah; }, [playingSurah]);
+  useEffect(() => { selectedReciterRef.current = selectedReciter; }, [selectedReciter]);
+  useEffect(() => { surahsRef.current = surahs; }, [surahs]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  useEffect(() => { durationRef.current = duration; }, [duration]);
+  useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+  useEffect(() => { volumeRef.current = volume; }, [volume]);
+
+  // Audio play function
+  const playAudio = useCallback(async (reciterId: string, surahNumber: number, surahName: string) => {
+    try {
+      setIsLoading(true);
+
+      const audioUrl = await getValidAudioUrl(reciterId, surahNumber);
+      if (!audioUrl) {
+        throw new Error('لم يتم العثور على رابط صوتي صالح');
+      }
+
+      const reciter = getReciterById(reciterId);
+      const reciterName = reciter?.arabic_name || 'قارئ غير معروف';
+
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        await audioRef.current.play();
+
+        setSelectedReciter(reciter || null);
+        setPlayingSurah(surahNumber);
+        setIsPlaying(true);
+
+        toast.success(`تم تشغيل ${surahName} بصوت ${reciterName}`, {
+          duration: 3000,
+          position: 'top-center',
+        });
+      }
+    } catch (error) {
+      console.error('خطأ في تشغيل الصوت:', error);
+      toast.error('فشل في تشغيل الصوت. يرجى المحاولة مرة أخرى');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const togglePlayPause = useCallback(() => {
+    if (!audioRef.current) return;
+
+    if (isPlayingRef.current) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+  }, []);
+
+  const playNext = useCallback(() => {
+    const surah = playingSurahRef.current;
+    const reciter = selectedReciterRef.current;
+    if (!surah || !reciter) return;
+
+    const nextSurah = surah < 114 ? surah + 1 : 1;
+    const surahName = surahsRef.current.find(s => s.number === nextSurah)?.name || '';
+    playAudio(reciter.id, nextSurah, surahName);
+  }, [playAudio]);
+
+  const playPrevious = useCallback(() => {
+    const surah = playingSurahRef.current;
+    const reciter = selectedReciterRef.current;
+    if (!surah || !reciter) return;
+
+    const previousSurah = surah > 1 ? surah - 1 : 114;
+    const surahName = surahsRef.current.find(s => s.number === previousSurah)?.name || '';
+    playAudio(reciter.id, previousSurah, surahName);
+  }, [playAudio]);
+
+  const setVolume = useCallback((newVolume: number) => {
+    const clampedVolume = Math.max(0, Math.min(1, newVolume));
+    setVolumeState(clampedVolume);
+
+    if (audioRef.current) {
+      audioRef.current.volume = clampedVolume;
+    }
+
+    localStorage.setItem('quran-audio-volume', clampedVolume.toString());
+  }, []);
+
+  const seek = useCallback((time: number) => {
+    if (audioRef.current && durationRef.current > 0) {
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  }, []);
+
+  const setReciter = useCallback((reciterId: string) => {
+    setReciters(prevReciters => {
+      const reciter = prevReciters.find(r => r.id === reciterId);
+      if (reciter) {
+        setSelectedReciter(reciter);
+
+        if (playingSurahRef.current !== null && audioRef.current) {
+          audioRef.current.pause();
+          setPlayingSurah(null);
+          setIsPlaying(false);
+          setCurrentTime(0);
+          toast.success(`تم تغيير القارئ إلى ${reciter.arabic_name}`);
+        }
+      }
+      return prevReciters;
+    });
+  }, []);
+
+  const jumpToSurah = useCallback((surahNumber: number) => {
+    const reciter = selectedReciterRef.current;
+    if (reciter && surahNumber >= 1 && surahNumber <= 114) {
+      const surahName = surahsRef.current.find(s => s.number === surahNumber)?.name || '';
+      playAudio(reciter.id, surahNumber, surahName);
+    }
+  }, [playAudio]);
+
+  const autoPlayNext = useCallback(() => {
+    const surah = playingSurahRef.current;
+    const reciter = selectedReciterRef.current;
+
+    if (surah && surah < 114 && reciter) {
+      const nextSurah = surah + 1;
+      const surahName = surahsRef.current.find(s => s.number === nextSurah)?.name || '';
+
+      toast.success('انتهت السورة. سأقوم بتشغيل السورة التالية...', {
+        duration: 3000,
+        icon: '⏭️'
+      });
+
+      setTimeout(() => {
+        playAudio(reciter.id, nextSurah, surahName);
+      }, 2000);
+    } else {
+      setPlayingSurah(null);
+      toast.success('تم انتهاء التلاوة. جزاك الله خيراً', {
+        duration: 4000,
+        icon: '🤲'
+      });
+    }
+  }, [playAudio]);
+
+  // Update Media Session metadata
+  const updateMediaSession = useCallback(() => {
+    if ('mediaSession' in navigator && playingSurahRef.current && selectedReciterRef.current) {
+      const currentSurah = surahsRef.current.find(s => s.number === playingSurahRef.current);
+
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSurah?.name || `سورة رقم ${playingSurahRef.current}`,
+        artist: selectedReciterRef.current.arabic_name,
+        album: 'القرآن الكريم',
+        artwork: [
+          { src: '/favicon.ico', sizes: '96x96', type: 'image/x-icon' }
+        ]
+      });
+
+      navigator.mediaSession.playbackState = isPlayingRef.current ? 'playing' : 'paused';
+
+      if (audioRef.current && durationRef.current > 0) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: durationRef.current,
+            playbackRate: audioRef.current.playbackRate,
+            position: currentTimeRef.current
+          });
+        } catch {
+          // Media Session position update failed silently
+        }
+      }
+    }
+  }, []);
 
   // Initialize audio and data
   useEffect(() => {
@@ -118,12 +299,13 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
         autoPlayNext();
       };
 
-      const handleError = (e: any) => {
-        console.error('Audio error:', e.target?.error);
+      const handleError = (e: Event) => {
+        const target = e.target as HTMLAudioElement;
+        console.error('Audio error:', target?.error);
         setIsLoading(false);
         setIsPlaying(false);
 
-        const errorCode = e.target?.error?.code;
+        const errorCode = target?.error?.code;
         let errorMessage = 'حدث خطأ أثناء تشغيل الصوت';
 
         if (errorCode === 4) {
@@ -148,18 +330,66 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
       audioRef.current = audio;
 
       // Setup Media Session API
-      setupMediaSession();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => {
+          audioRef.current?.play();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          audioRef.current?.pause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          playPrevious();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          playNext();
+        });
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (audioRef.current && details.seekTime) {
+            audioRef.current.currentTime = details.seekTime;
+          }
+        });
+      }
 
       // Setup keyboard shortcuts
-      setupKeyboardShortcuts();
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (document.activeElement?.tagName === 'INPUT' ||
+          document.activeElement?.tagName === 'TEXTAREA') {
+          return;
+        }
 
-      // Prevent audio pause on page visibility change
-      const handleVisibilityChange = () => {
-        if (document.hidden && audio && !audio.paused) {
-          console.log('Page hidden, continuing audio playback');
+        switch (e.code) {
+          case 'Space':
+            e.preventDefault();
+            togglePlayPause();
+            break;
+          case 'ArrowRight':
+            if (e.ctrlKey) {
+              e.preventDefault();
+              playNext();
+            }
+            break;
+          case 'ArrowLeft':
+            if (e.ctrlKey) {
+              e.preventDefault();
+              playPrevious();
+            }
+            break;
+          case 'ArrowUp':
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setVolume(Math.min(1, volumeRef.current + 0.1));
+            }
+            break;
+          case 'ArrowDown':
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setVolume(Math.max(0, volumeRef.current - 0.1));
+            }
+            break;
         }
       };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      document.addEventListener('keydown', handleKeyDown);
 
       // Cleanup
       return () => {
@@ -175,240 +405,12 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
           audio.pause();
           audio.src = '';
         }
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.removeEventListener('keydown', handleKeyDown);
       };
     };
 
     initializeAudio();
-  }, []);
-
-  // Setup Media Session API for system controls
-  const setupMediaSession = () => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.setActionHandler('play', () => {
-        if (audioRef.current && playingSurah) {
-          audioRef.current.play();
-        }
-      });
-
-      navigator.mediaSession.setActionHandler('pause', () => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-      });
-
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-        playPrevious();
-      });
-
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-        playNext();
-      });
-
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (audioRef.current && details.seekTime) {
-          audioRef.current.currentTime = details.seekTime;
-        }
-      });
-    }
-  };
-
-  // Setup keyboard shortcuts for desktop
-  const setupKeyboardShortcuts = () => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle shortcuts when no input is focused
-      if (document.activeElement?.tagName === 'INPUT' ||
-          document.activeElement?.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      switch (e.code) {
-        case 'Space':
-          e.preventDefault();
-          togglePlayPause();
-          break;
-        case 'ArrowRight':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            playNext();
-          }
-          break;
-        case 'ArrowLeft':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            playPrevious();
-          }
-          break;
-        case 'ArrowUp':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            setVolume(Math.min(1, volume + 0.1));
-          }
-          break;
-        case 'ArrowDown':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            setVolume(Math.max(0, volume - 0.1));
-          }
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  };
-
-  // Update Media Session metadata
-  const updateMediaSession = () => {
-    if ('mediaSession' in navigator && playingSurah && selectedReciter) {
-      const currentSurah = surahs.find(s => s.number === playingSurah);
-
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentSurah?.name || `سورة رقم ${playingSurah}`,
-        artist: selectedReciter.arabic_name,
-        album: 'القرآن الكريم',
-        artwork: [
-          { src: '/favicon.ico', sizes: '96x96', type: 'image/x-icon' }
-        ]
-      });
-
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-
-      if (audioRef.current && duration > 0) {
-        try {
-          navigator.mediaSession.setPositionState({
-            duration: duration,
-            playbackRate: audioRef.current.playbackRate,
-            position: currentTime
-          });
-        } catch (error) {
-          console.log('Media Session position update failed:', error);
-        }
-      }
-    }
-  };
-
-  // Audio actions
-  const playAudio = async (reciterId: string, surahNumber: number, surahName: string) => {
-    try {
-      setIsLoading(true);
-
-      const audioUrl = await getValidAudioUrl(reciterId, surahNumber);
-      if (!audioUrl) {
-        throw new Error('لم يتم العثور على رابط صوتي صالح');
-      }
-
-      const reciter = getReciterById(reciterId);
-      const reciterName = reciter?.arabic_name || 'قارئ غير معروف';
-
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        await audioRef.current.play();
-
-        setSelectedReciter(reciter || null);
-        setPlayingSurah(surahNumber);
-        setIsPlaying(true);
-
-        toast.success(`تم تشغيل ${surahName} بصوت ${reciterName}`, {
-          duration: 3000,
-          position: 'top-center',
-        });
-      }
-    } catch (error) {
-      console.error('خطأ في تشغيل الصوت:', error);
-      toast.error('فشل في تشغيل الصوت. يرجى المحاولة مرة أخرى');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const togglePlayPause = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-  };
-
-  const playNext = () => {
-    if (!playingSurah || !selectedReciter) return;
-
-    const nextSurah = playingSurah < 114 ? playingSurah + 1 : 1;
-    const surahName = surahs.find(s => s.number === nextSurah)?.name || '';
-    playAudio(selectedReciter.id, nextSurah, surahName);
-  };
-
-  const playPrevious = () => {
-    if (!playingSurah || !selectedReciter) return;
-
-    const previousSurah = playingSurah > 1 ? playingSurah - 1 : 114;
-    const surahName = surahs.find(s => s.number === previousSurah)?.name || '';
-    playAudio(selectedReciter.id, previousSurah, surahName);
-  };
-
-  const setVolume = (newVolume: number) => {
-    const clampedVolume = Math.max(0, Math.min(1, newVolume));
-    setVolumeState(clampedVolume);
-
-    if (audioRef.current) {
-      audioRef.current.volume = clampedVolume;
-    }
-
-    localStorage.setItem('quran-audio-volume', clampedVolume.toString());
-  };
-
-  const seek = (time: number) => {
-    if (audioRef.current && duration > 0) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
-  };
-
-  const setReciter = (reciterId: string) => {
-    const reciter = reciters.find(r => r.id === reciterId);
-    if (reciter) {
-      setSelectedReciter(reciter);
-
-      if (playingSurah !== null && audioRef.current) {
-        audioRef.current.pause();
-        setPlayingSurah(null);
-        setIsPlaying(false);
-        setCurrentTime(0);
-        toast.success(`تم تغيير القارئ إلى ${reciter.arabic_name}`);
-      }
-    }
-  };
-
-  const jumpToSurah = (surahNumber: number) => {
-    if (selectedReciter && surahNumber >= 1 && surahNumber <= 114) {
-      const surahName = surahs.find(s => s.number === surahNumber)?.name || '';
-      playAudio(selectedReciter.id, surahNumber, surahName);
-    }
-  };
-
-  const autoPlayNext = () => {
-    if (playingSurah && playingSurah < 114 && selectedReciter) {
-      const nextSurah = playingSurah + 1;
-      const surahName = surahs.find(s => s.number === nextSurah)?.name || '';
-
-      toast.success(`انتهت السورة. سأقوم بتشغيل السورة التالية...`, {
-        duration: 3000,
-        icon: '⏭️'
-      });
-
-      setTimeout(() => {
-        playAudio(selectedReciter.id, nextSurah, surahName);
-      }, 2000);
-    } else {
-      setPlayingSurah(null);
-      toast.success('تم انتهاء التلاوة. جزاك الله خيراً', {
-        duration: 4000,
-        icon: '🤲'
-      });
-    }
-  };
+  }, [autoPlayNext, playNext, playPrevious, togglePlayPause, setVolume, updateMediaSession]);
 
   const contextValue: AudioContextType = {
     isPlaying,

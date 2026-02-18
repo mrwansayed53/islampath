@@ -1,35 +1,36 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
 
-// Pages
-import HomePage from './pages/HomePage';
-import QuranPage from './pages/QuranPage';
-import AudioQuranPage from './pages/AudioQuranPage';
-import ProphetsStoriesPage from './pages/ProphetsStoriesPage';
-import ProphetStoryDetailPage from './pages/ProphetStoryDetailPage';
-import HadithPage from './pages/HadithPage';
-import RuqyahPage from './pages/RuqyahPage';
-import ChildrenEducationPage from './pages/ChildrenEducationPage';
-import AdhkarPage from './pages/AdhkarPage';
-
-// Admin Pages
-import AdminLoginPage from './pages/admin/AdminLoginPage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminHadithPage from './pages/admin/AdminHadithPage';
-import AdminProphetsPage from './pages/admin/AdminProphetsPage';
-import AdminAdhkarPage from './pages/admin/AdminAdhkarPage';
-import AdminRecitersPage from './pages/admin/AdminRecitersPage';
+// Lazy-loaded Pages
+const HomePage = React.lazy(() => import('./pages/HomePage'));
+const QuranPage = React.lazy(() => import('./pages/QuranPage'));
+const AudioQuranPage = React.lazy(() => import('./pages/AudioQuranPage'));
+const ProphetsStoriesPage = React.lazy(() => import('./pages/ProphetsStoriesPage'));
+const ProphetStoryDetailPage = React.lazy(() => import('./pages/ProphetStoryDetailPage'));
+const HadithPage = React.lazy(() => import('./pages/HadithPage'));
+const RuqyahPage = React.lazy(() => import('./pages/RuqyahPage'));
+const ChildrenEducationPage = React.lazy(() => import('./pages/ChildrenEducationPage'));
+const AdhkarPage = React.lazy(() => import('./pages/AdhkarPage'));
 
 // Components
-import ProtectedRoute from './components/ProtectedRoute';
-import AdminRedirect from './components/AdminRedirect';
 import PersistentAudioPlayer from './components/PersistentAudioPlayer';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AudioProvider } from './contexts/AudioContext';
 import { trackPageView } from './utils/analytics';
+
+// Loading fallback
+const PageLoader = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mx-auto mb-3"></div>
+      <p className="text-gray-500 dark:text-gray-400 text-sm font-noto-arabic">جاري التحميل...</p>
+    </div>
+  </div>
+);
 
 function RouteChangeTracker() {
   const location = useLocation();
@@ -43,65 +44,91 @@ function RouteChangeTracker() {
 
 function App() {
   return (
-    <AudioProvider>
-      <Router>
-        <RouteChangeTracker />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#fff',
-              color: '#1E6F5C',
-              border: '1px solid #1E6F5C',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontFamily: 'Noto Sans Arabic, sans-serif'
-            },
-            success: {
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
+    <ErrorBoundary>
+      <AudioProvider>
+        <Router>
+          <RouteChangeTracker />
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#fff',
+                color: '#1E6F5C',
+                border: '1px solid #1E6F5C',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontFamily: 'Noto Sans Arabic, sans-serif'
               },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
+              success: {
+                iconTheme: {
+                  primary: '#10b981',
+                  secondary: '#fff',
+                },
               },
-            },
-          }}
-        />
-        <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="quran" element={<QuranPage />} />
-          <Route path="audio-quran" element={<AudioQuranPage />} />
-          <Route path="prophets-stories" element={<ProphetsStoriesPage />} />
-          <Route path="prophets-stories/:id" element={<ProphetStoryDetailPage />} />
-          <Route path="hadith" element={<HadithPage />} />
-          <Route path="ruqyah" element={<RuqyahPage />} />
-          <Route path="children-education" element={<ChildrenEducationPage />} />
-          <Route path="adhkar" element={<AdhkarPage />} />
-        </Route>
-        
-        {/* Admin Login Route (outside MainLayout) */}
-        <Route path="admin/login" element={<AdminLoginPage />} />
-        
-        {/* Protected Admin Routes */}
-        <Route path="/" element={<MainLayout />}>
-          <Route path="admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-          <Route path="admin/hadiths" element={<ProtectedRoute><AdminHadithPage /></ProtectedRoute>} />
-          <Route path="admin/prophets" element={<ProtectedRoute><AdminProphetsPage /></ProtectedRoute>} />
-          <Route path="admin/adhkar" element={<ProtectedRoute><AdminAdhkarPage /></ProtectedRoute>} />
-          <Route path="admin/reciters" element={<ProtectedRoute><AdminRecitersPage /></ProtectedRoute>} />
-        </Route>
-      </Routes>
+              error: {
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
+          <Routes>
+            <Route path="/" element={<MainLayout />}>
+              <Route index element={
+                <Suspense fallback={<PageLoader />}>
+                  <HomePage />
+                </Suspense>
+              } />
+              <Route path="quran" element={
+                <Suspense fallback={<PageLoader />}>
+                  <QuranPage />
+                </Suspense>
+              } />
+              <Route path="audio-quran" element={
+                <Suspense fallback={<PageLoader />}>
+                  <AudioQuranPage />
+                </Suspense>
+              } />
+              <Route path="prophets-stories" element={
+                <Suspense fallback={<PageLoader />}>
+                  <ProphetsStoriesPage />
+                </Suspense>
+              } />
+              <Route path="prophets-stories/:id" element={
+                <Suspense fallback={<PageLoader />}>
+                  <ProphetStoryDetailPage />
+                </Suspense>
+              } />
+              <Route path="hadith" element={
+                <Suspense fallback={<PageLoader />}>
+                  <HadithPage />
+                </Suspense>
+              } />
+              <Route path="ruqyah" element={
+                <Suspense fallback={<PageLoader />}>
+                  <RuqyahPage />
+                </Suspense>
+              } />
+              <Route path="children-education" element={
+                <Suspense fallback={<PageLoader />}>
+                  <ChildrenEducationPage />
+                </Suspense>
+              } />
+              <Route path="adhkar" element={
+                <Suspense fallback={<PageLoader />}>
+                  <AdhkarPage />
+                </Suspense>
+              } />
+            </Route>
+          </Routes>
 
-      {/* Persistent Audio Player */}
-      <PersistentAudioPlayer />
-    </Router>
-    </AudioProvider>
+          {/* Persistent Audio Player */}
+          <PersistentAudioPlayer />
+        </Router>
+      </AudioProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import RealMushafReader from '../components/RealMushafReader';
 import SEO from '../components/SEO';
 
 const QuranPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-
   return (
     <>
       <SEO title="القرآن الكريم" description="اقرأ القرآن الكريم كاملاً مع التفسير واستمع للتلاوات." />
@@ -19,7 +17,7 @@ const QuranPage: React.FC = () => {
         </div>
 
         <div className="w-full">
-          <RealMushafReader loading={loading} />
+          <RealMushafReader />
         </div>
       </div>
     </>
